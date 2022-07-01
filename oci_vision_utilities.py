@@ -12,25 +12,25 @@ import cv2
 
 
 class OCIVisionImage:
-    def __init__(self, path_name, model_id, ai_service_vision_client, label_map):
+    def __init__(self, path_name, model_id, ai_service_vision_client, label_map, threshold=0.5):
         # the second parms is the OCID of the model
         self.MAX_RESULTS = 5
         self.MODEL_ID = model_id
+        # it is used only to display bb
+        self.THRESHOLD = threshold
         self.vision_client = ai_service_vision_client
 
-        # label color map
-        # color map for logos
+        # color map for logos: one color for each logos
         self.label_map = label_map
 
         self.is_analyzed = False
 
-        # get image size
         # read the image file with cv2
         self.path_name = path_name
 
         # store img as numpy array
         self.cv2_im = cv2.imread(self.path_name)
-
+        # store the image as encoded string
         self.encoded_string = self.get_encoded_string()
 
         self.height, self.width, self.channels = self.get_image_size()
@@ -80,7 +80,6 @@ class OCIVisionImage:
         self.is_analyzed = True
         self.raw_results = res.data
 
-        # list of logos
         # Extract Bounding Boxes from results
         # transform in JSON
         od_results = json.loads(str(self.raw_results))
@@ -93,7 +92,9 @@ class OCIVisionImage:
 
         if self.od_bounding_boxes is not None:
             for box in self.od_bounding_boxes:
-                list_logos.append(box["name"])
+                # using threshold also here
+                if box["confidence"] >= self.THRESHOLD:
+                    list_logos.append(box["name"])
         else:
             list_logos.append("")
 
@@ -101,7 +102,10 @@ class OCIVisionImage:
         list_logos = sorted(list(set(list_logos)))
 
         self.list_logos = list_logos
-
+        
+    #
+    # This 3 func give the result of analysis stored in the object
+    #
     def get_raw_results(self):
         return self.raw_results
 
@@ -114,10 +118,10 @@ class OCIVisionImage:
 
         im_bb = self.cv2_im.copy()
 
-        # Iterate over each Bounding Box
+        # Iterate over each Bounding Box and add to im_bb
         if self.od_bounding_boxes is not None:
             for box in self.od_bounding_boxes:
-                if box["confidence"] >= THRESHOLD:
+                if box["confidence"] >= self.THRESHOLD:
                     # Extract opposite coordinates for bounding box
                     # Un-Normalise the Data by scaling to the max image height and width
                     # Convert to Integer
